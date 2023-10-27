@@ -1,0 +1,203 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
+
+class Question {
+private:
+    std::string question;
+    std::vector<std::string> choices;
+    int correctAnswer;
+
+public:
+    Question() {
+        correctAnswer = -1; // Initialize to an invalid value
+    }
+
+    void inputQuestion() {
+        std::cout << "Enter the question: ";
+        std::cin.ignore();
+        std::getline(std::cin, question);
+
+        std::cout << "Enter the multiple-choice answers (enter 'Q' to stop):\n";
+        std::string choice;
+        int choiceNum = 1;
+        while (true) {
+            std::cout << choiceNum << ". ";
+            std::getline(std::cin, choice);
+            if (choice == "Q" || choice == "q") {
+                break;
+            }
+            choices.push_back(choice);
+            choiceNum++;
+        }
+
+        std::cout << "Enter the correct answer (1-" << choices.size() << "): ";
+        std::cin >> correctAnswer;
+    }
+
+    void saveQuestion(std::ofstream& outFile) {
+        outFile << question << std::endl;
+        for (size_t i = 0; i < choices.size(); i++) {
+            outFile << i + 1 << ". " << choices[i] << std::endl;
+        }
+        outFile << "Correct Answer: " << correctAnswer << std::endl;
+        outFile << std::endl;
+    }
+
+    bool isComplete() const {
+        return !question.empty() && !choices.empty() && correctAnswer > 0 && correctAnswer <= choices.size();
+    }
+
+    void displayQuestion() const {
+        std::cout << question << std::endl;
+        for (size_t i = 0; i < choices.size(); i++) {
+            std::cout << i + 1 << ". " << choices[i] << std::endl;
+        }
+    }
+
+    int getCorrectAnswer() const {
+        return correctAnswer;
+    }
+};
+
+class Quiz {
+private:
+    std::vector<Question> questions;
+
+public:
+    void addQuestion() {
+        Question newQuestion;
+        newQuestion.inputQuestion();
+        if (newQuestion.isComplete()) {
+            questions.push_back(newQuestion);
+            std::cout << "Question added successfully!\n";
+        } else {
+            std::cout << "Incomplete question. Please enter all required information.\n";
+        }
+    }
+
+    void saveQuestionsToFile(const std::string& filename) {
+        std::ofstream outFile(filename);
+        if (outFile.is_open()) {
+            for (const Question& q : questions) {
+                q.saveQuestion(outFile);
+            }
+            outFile.close();
+            std::cout << "Questions saved to " << filename << "\n";
+        } else {
+            std::cout << "Error opening the file for writing.\n";
+        }
+    }
+
+    void loadQuestionsFromFile(const std::string& filename) {
+        std::ifstream inFile(filename);
+        if (inFile.is_open()) {
+            Question q;
+            while (!inFile.eof()) {
+                std::getline(inFile, q.question);
+                for (int i = 0; i < 4; i++) {
+                    std::string choice;
+                    std::getline(inFile, choice);
+                    q.choices.push_back(choice);
+                }
+                std::string correctLine;
+                std::getline(inFile, correctLine);
+                size_t pos = correctLine.find("Correct Answer: ");
+                if (pos != std::string::npos) {
+                    q.correctAnswer = std::stoi(correctLine.substr(pos + 16));
+                }
+                if (q.isComplete()) {
+                    questions.push_back(q);
+                    q = Question();
+                }
+            }
+            inFile.close();
+            std::cout << "Questions loaded from " << filename << "\n";
+        } else {
+            std::cout << "Error opening the file for reading.\n";
+        }
+    }
+
+    void generateTest(const std::string& testFilename, int numQuestions) {
+        std::ofstream outFile(testFilename);
+        if (outFile.is_open()) {
+            if (questions.size() < numQuestions) {
+                std::cout << "Error: Not enough questions available for the test.\n";
+                return;
+            }
+            srand(static_cast<unsigned>(time(nullptr)));
+            std::vector<int> selectedQuestions;
+            while (selectedQuestions.size() < numQuestions) {
+                int randomIndex = rand() % questions.size();
+                if (std::find(selectedQuestions.begin(), selectedQuestions.end(), randomIndex) == selectedQuestions.end()) {
+                    selectedQuestions.push_back(randomIndex);
+                }
+            }
+            for (int i : selectedQuestions) {
+                questions[i].displayQuestion();
+                for (size_t j = 0; j < questions[i].choices.size(); j++) {
+                    if (j != questions[i].getCorrectAnswer() - 1) {
+                        outFile << j + 1 << ". " << questions[i].choices[j] << std::endl;
+                    }
+                }
+                outFile << std::endl;
+            }
+            outFile.close();
+            std::cout << "Test questions saved to " << testFilename << "\n";
+        } else {
+            std::cout << "Error opening the file for writing.\n";
+        }
+    }
+};
+
+int main() {
+    Quiz quiz;
+    int choice;
+    std::string filename;
+    int numQuestions;
+
+    while (true) {
+        std::cout << "Menu:\n";
+        std::cout << "1. Add a question\n";
+        std::cout << "2. Save questions to file\n";
+        std::cout << "3. Load questions from file\n";
+        std::cout << "4. Generate a test\n";
+        std::cout << "5. Quit\n";
+        std::cout << "Enter your choice: ";
+        std::cin >> choice;
+
+        switch (choice) {
+            case 1:
+                quiz.addQuestion();
+                break;
+            case 2:
+                std::cout << "Enter the filename to save the questions: ";
+                std::cin >> filename;
+                quiz.saveQuestionsToFile(filename);
+                break;
+            case 3:
+                std::cout << "Enter the filename to load questions from: ";
+                std::cin >> filename;
+                quiz.loadQuestionsFromFile(filename);
+                break;
+            case 4:
+                std::cout << "Enter the number of questions for the test: ";
+                std::cin >> numQuestions;
+                std::cout << "Enter the filename to save the test: ";
+                std::cin >> filename;
+                quiz.generateTest(filename, numQuestions);
+                break;
+            case 5:
+                return 0;
+            default:
+                std::cout << "Invalid choice. Please try again.\n";
+                break;
+        }
+    }
+
+    return 0;
+}
